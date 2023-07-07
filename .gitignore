@@ -1,0 +1,6 @@
+# Built binary
+/go-websocket-webtransport-server
+
+# TLS certificates for WebTransport
+/*.key
+/*.pem

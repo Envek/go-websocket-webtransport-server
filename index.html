@@ -1,0 +1,70 @@
+<html>
+
+<body>
+  <h1>WebTransport</h1>
+  <p>See console for output.</p>
+
+  <h2>Chat</h2>
+  <textarea id="chatOutput" rows="10" cols="50" readonly></textarea>
+  <form id="chatForm">
+    <input type="text" id="chatInput" placeholder="Enter message">
+    <input type="submit" value="Send">
+  </form>
+</body>
+
+<script>
+    async function main() {
+    const streamReader = async (stream, errorText, dataReceivedFunction) => {
+      try {
+        let reader = stream.getReader();
+        while (true) {
+          data = await reader.read();
+          if (data.done) {
+            break;
+          }
+          dataReceivedFunction(data.value);
+        }
+      } catch(error) {
+        console.log(errorText + ':', error);
+      }
+    };
+
+    // Text encoder and decoder
+    let encoder = new TextEncoder();
+    let decoder = new TextDecoder();
+
+    // Connect to WebTransport server
+    let transport = new WebTransport("https://localhost:4433/chat");
+    await transport.ready;
+
+    transport.closed
+      .then(() => console.log('Connection closed normally'))
+      .catch(error => console.log('Connection closed abruptly', error));
+
+    let chatStream, writer;
+
+    streamReader(transport.incomingBidirectionalStreams, 'Incoming bidi stream error', stream => {
+      console.log('Received an incoming bidi stream');
+      chatStream = stream;
+      writer = stream.writable.getWriter();
+      streamReader(stream.readable, 'Incoming bidi stream receive error', async data => {
+        let text = decoder.decode(data);
+        console.log('Received on incoming bidi stream:', text);
+        const chatOutput = document.getElementById('chatOutput');
+        chatOutput.value += text + '\n';
+      });
+    });
+
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+
+    chatForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      await writer.write(encoder.encode(chatInput.value));
+      chatInput.value = '';
+    });
+  }
+
+  main();
+</script>
+</html>
